@@ -20,5 +20,7 @@ weatherhist = p1[[1]]
   #Will also need to change how the date appears in the first column and rename to something besides "2017". 
   #As the data is,it is just the number of the day with no association to which month. The month is only in the row header. 
 
+bikedata = read.csv("2017-fordgobike-tripdata.csv")
 
+#Have the start and end times be read as dates. 
 
