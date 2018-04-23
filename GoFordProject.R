@@ -19,3 +19,6 @@ weatherhist = p1[[1]]
 #In the weatherhist data frame, the headers repeat each month, so we will need to clean that up. 
   #Will also need to change how the date appears in the first column and rename to something besides "2017". 
   #As the data is,it is just the number of the day with no association to which month. The month is only in the row header. 
+
+
+
