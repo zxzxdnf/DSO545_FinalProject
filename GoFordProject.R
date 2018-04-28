@@ -20,7 +20,12 @@ weatherhist = p1[[1]]
   #Will also need to change how the date appears in the first column and rename to something besides "2017". 
   #As the data is,it is just the number of the day with no association to which month. The month is only in the row header. 
 
-bikedata = read.csv("2017-fordgobike-tripdata.csv")
-
+bikedata17 = read.csv("2017-fordgobike-tripdata.csv", stringsAsFactors = F)
+bikedata181 = read.csv("201801_fordgobike_tripdata.csv", stringsAsFactors = F)
+bikedata182 = read.csv("201802_fordgobike_tripdata.csv", stringsAsFactors = F)
+bikedata183 = read.csv("201803_fordgobike_tripdata.csv", stringsAsFactors = F)
+bikedata$start_time <- ymd_hms(bikedata$start_time)
+bikedata$end_time <- ymd_hms(bikedata$end_time)
 #Have the start and end times be read as dates. 
+range(bikedata$start_time)
 
