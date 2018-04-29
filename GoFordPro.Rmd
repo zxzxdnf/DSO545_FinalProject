@@ -15,24 +15,14 @@ knitr::opts_chunk$set(cache = TRUE, message = FALSE, warning = FALSE, root.dir =
 library(data.table)
 library(ggplot2)
 library(dplyr)
+# String manipulation
 library(stringr)
+# Parsing of HTML/XML files  
 library(rvest)
+# Eases DateTime manipulation
 library(lubridate)
 ```
 
-## Upload weather data from weatherunderground.com
-
-```{r}
-page1 = "https://www.wunderground.com/history/airport/KSFO/2017/6/28/CustomHistory.html?dayend=31&monthend=12&yearend=2017&req_city=&req_state=&req_statename=&reqdb.zip=&reqdb.magic=&reqdb.wmo="
-
-p1 = page1 %>%
-  read_html() %>%
-  html_nodes(xpath = '//*[@id="obsTable"]') %>%
-  html_table()
-
-#Get the dataframe from the list
-weatherhist = p1[[1]]
-```
 
 #In the weatherhist data frame, the headers repeat each month, so we will need to clean that up. 
 #Will also need to change how the date appears in the first column and rename to something besides "2017". 
@@ -46,15 +36,99 @@ bikedata182 = fread("201802_fordgobike_tripdata.csv", stringsAsFactors = F)
 bikedata183 = fread("201803_fordgobike_tripdata.csv", stringsAsFactors = F)
 #fread() is part of the data.table package in R and they perform significantly faster than the base read.csv() and write.csv() functions.
 
-bikedata <- rbindlist(lapply(c("2017-fordgobike-tripdata.csv","201801_fordgobike_tripdata.csv","201802_fordgobike_tripdata.csv","201803_fordgobike_tripdata.csv"),fread))
-#code above combine all the csv files together
 
+#Combine all the csv files together
+bikedata <- rbindlist(lapply(c("2017-fordgobike-tripdata.csv","201801_fordgobike_tripdata.csv","201802_fordgobike_tripdata.csv","201803_fordgobike_tripdata.csv"),fread,stringsAsFactors = F))
+
+
+
+#Have the start and end times be read as dates. 
 bikedata$start_time <- ymd_hms(bikedata$start_time)
 bikedata$end_time <- ymd_hms(bikedata$end_time)
 
-#Have the start and end times be read as dates. 
 
-
+#See the date range
+range(bikedata$start_time)
 ```
 
+## Upload weather data from weatherunderground.com
 
+```{r}
+#Upload all the weather data from weatherunderground.com
+
+page1 = "https://www.wunderground.com/history/airport/KSFO/2017/6/28/CustomHistory.html?dayend=31&monthend=3&yearend=2018&req_city=&req_state=&req_statename=&reqdb.zip=&reqdb.magic=&reqdb.wmo="
+
+p1 = page1 %>%
+  read_html() %>%
+  html_nodes(xpath = '//*[@id="obsTable"]') %>%
+  html_table()
+
+#Get the dataframe from the list
+weatherhist = p1[[1]]
+
+# Too messy with extra rows of column names
+
+
+# Try to rebuild the table by combining weather data in each month
+
+# June only contain the last 3 days' data, so the url pattern is different
+page176 = "https://www.wunderground.com/history/airport/KSFO/2017/6/28/CustomHistory.html?dayend=30&monthend=6&yearend=2017&req_city=&req_state=&req_statename=&reqdb.zip=&reqdb.magic=&reqdb.wmo="
+
+# Other months could be collected via specific pattern url.
+months_2017 = c(7,8,9,10,11,12)
+months_2018 =c(1,2,3)
+
+# Urls
+url.base2017 <- "https://www.wunderground.com/history/airport/KSFO/2017/"
+url.base2018 <- "https://www.wunderground.com/history/airport/KSFO/2018/"
+url.end <- "/1/MonthlyHistory.html?req_city=&req_state=&req_statename=&reqdb.zip=&reqdb.magic=&reqdb.wmo="
+urls2017 <- paste0(url.base2017,months_2017,url.end)
+urls2018 <- paste0(url.base2018,months_2018,url.end)
+
+# Lists of weather data
+p17list <- lapply(c(page176,urls2017), function(i) {
+    read_html(i) %>%
+    html_nodes(xpath = '//*[@id="obsTable"]') %>%
+    html_table()
+})
+
+p18list <- lapply(urls2018, function(i) {
+    read_html(i) %>%
+    html_nodes(xpath = '//*[@id="obsTable"]') %>%
+    html_table()
+})
+
+# Change the column name and add Date
+#2017
+for ( i in 1:length(p17list)) {
+  month <- p17list[[i]][[1]]
+  names <- month[1,]
+  names[,length(names)]<-""
+  month <- month[-1,]
+  coln <- colnames(month)
+  colnames(month)<- paste(coln,"-",names)
+  month$Date <- ymd(paste(colnames(month)[1],month[,1]))
+  p17list[[i]][[1]]<- month[,-1]
+}
+#2018
+for ( i in 1:length(p18list)) {
+  month <- p18list[[i]][[1]]
+  names <- month[1,]
+  names[,length(names)]<-""
+  month <- month[-1,]
+  coln <- colnames(month)
+  colnames(month)<- paste(coln,"-",names)
+  month$Date <- ymd(paste(colnames(month)[1],month[,1]))
+  p18list[[i]][[1]]<- month[,-1]
+}
+# Combine the new table
+p17list2 <- do.call(rbind, p17list)
+final17 <- do.call(rbind, p17list2)
+p18list2 <- do.call(rbind, p18list)
+final18 <- do.call(rbind, p18list2)
+
+weatherhist <- rbind(final17,final18)
+rownames(weatherhist) <- NULL
+
+weatherhist = weatherhist %>% select(Date, colnames(weatherhist)[-1])
+```
