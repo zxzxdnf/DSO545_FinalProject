@@ -121,14 +121,18 @@ for ( i in 1:length(p18list)) {
   month$Date <- ymd(paste(colnames(month)[1],month[,1]))
   p18list[[i]][[1]]<- month[,-1]
 }
-# Combine the new table
+# Combine the new table as weatherhist
 p17list2 <- do.call(rbind, p17list)
 final17 <- do.call(rbind, p17list2)
 p18list2 <- do.call(rbind, p18list)
 final18 <- do.call(rbind, p18list2)
-
 weatherhist <- rbind(final17,final18)
+
+#reset the row index
 rownames(weatherhist) <- NULL
 
+#Switch the Date column to the first
 weatherhist = weatherhist %>% select(Date, colnames(weatherhist)[-1])
+#weatherhist = weatherhist %>% select(Date, everything())
+write.csv(weatherhist, file="weatherhist.csv")
 ```
