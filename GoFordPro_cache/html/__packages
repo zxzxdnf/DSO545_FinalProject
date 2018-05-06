@@ -1,0 +1,10 @@
+base
+data.table
+ggplot2
+ggmap
+dplyr
+stringr
+xml2
+rvest
+lubridate
+bindrcpp
