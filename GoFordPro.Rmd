@@ -291,6 +291,8 @@ all_data %>%
   #scale_y_continuous(breaks = seq(0,23,1))+
   guides(fill=F)+
   labs(x= "Weekday", y= "Hour of the Day", title= "Heatmap of FordBike Rental Hour V.S Day")
+## I think good personalization, is for people to choose (maybe via check boxes) what days of the week they want to see.
+## Another personalization in the app is for people to choose a count range, probably just greater than, on a scale.
 
 ```
 
