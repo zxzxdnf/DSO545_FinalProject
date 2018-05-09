@@ -24,6 +24,14 @@ library(stringr)
 library(rvest)
 # Eases DateTime manipulation
 library(lubridate)
+library(tidyr)
+library(geosphere)
+library(leaflet)
+library(RColorBrewer)
+library(shiny)
+library(tidyr)
+library(geosphere)
+library(rsconnect)
 ```
 
 
@@ -180,7 +188,7 @@ all_data$member_birth_year <- as.numeric(all_data$member_birth_year)
 summary(all_data$`Events - `)
 # Buil a bar plot to see the whether daily average temperature influences ride duration among different user type
 bike_temp <- all_data %>%
-  select('user_type','duration_min',`Temp. (°F) - avg`) %>%
+  select(colnames(all_data)[c(13,16,17)]) %>%
   group_by(`Temp. (°F) - avg`,user_type)%>%
   summarise(avg_duration=round(mean(duration_min),1))
 
@@ -190,13 +198,18 @@ bike_temp <- all_data %>%
                       fill= user_type))+
   geom_col(position = 'dodge',width = 1,color="white")+
   labs(x='Temperature',y='Average Duration',fill="User Type", title= "Average Rental Duration under Different Temperature")
+```
+
+```{r}
+
 
 # Subscribers and customers both show no significant difererence on the duration regarding different temperatures. However, customers tend to rent bikes about three times longer than those subscribers do.
 # 
 # How about usage?
+
   
 bike_temp_u  <- all_data %>%
-  select('user_type','duration_min',`Temp. (°F) - avg`) %>%
+  select(colnames(all_data)[c(13,16,17)]) %>%
   group_by(`Temp. (°F) - avg`,user_type)%>%
   summarise(usage=n())
 
@@ -208,11 +221,12 @@ bike_temp_u  <- all_data %>%
   labs(x='Temperature',y='Usage',fill="User Type", title= "Total Usage under Different Temperature")
   
 #Interestingly, Subscribers tend to use the bike much more often than customers do. Also, we notice that in the specific range of temperatue, both types of users tend to rent bikes more often. From the chart we can estimate is from 51 - 67.
+```
 
-
+```{r}
 #We might think if weather is associated with months since different seasons might also influence the flow of tourist and bike usage.
 bike_months <- all_data %>%
-  select('Date','user_type','duration_min',`Temp. (°F) - avg`) %>%
+  select(colnames(all_data)[c(1,13,16,17)]) %>%
   mutate(Month = lubridate::month(Date,label=T)) %>%
   filter(Month!="Jun")%>% # Only two days in June, so I exclude the two days.
   group_by(Month)%>%
@@ -228,6 +242,11 @@ bike_months$Month<-factor(bike_months$Month,levels[c(4:12,1:3)])
   geom_col()+
   geom_text(aes(label = monthly_avg_temp), vjust = 0, color = "red")+
   labs(x='Month',y='Average Duration',title = "Monthly Bike Usage Growth and Average Monthly Temperature")
+
+
+```
+
+```{r}
 
 
 # Beginning operation in August 2013 as Bay Area Bike Share, the Ford GoBike system currently has 2,500 bicycles in 260 stations across San Francisco, East Bay and San Jose. On June 28, 2017, the system officially launched as Ford GoBike in a partnership with Ford Motor Company.
@@ -253,6 +272,9 @@ bike_event %>%
   labs(x='Events',y='Average Daily Usage', fill="User Type", title= "Average Daily Usage under Different Events")
 
 
+```
+
+```{r}
 #Event VS average daily duration
 bike_event2 = all_data%>%
   select('Date','user_type','duration_min',`Events - `)%>%
@@ -265,6 +287,11 @@ bike_event2 %>%
   geom_col(position = 'dodge') +
   labs(x='Events',y='Average Daily Duration',fill="User Type", title= "Average Daily Duration under Different Events")
 
+
+```
+
+```{r}
+
 #Usage Growth over time
 all_data %>%
   select(Date,user_type,duration_min) %>%
@@ -276,23 +303,200 @@ all_data %>%
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 
-# Heatmap of Hubway Bike Rental Hour V.S Day
-all_data %>%
-  select(start_time)%>%
-  mutate(Hour= hour(start_time), Day= weekdays(start_time))%>%
-  group_by(Hour,Day) %>%
-  summarise(count= n()) %>%
-  ggplot(aes(x=factor(Day,levels = c("Sunday", "Monday", "Tuesday","Wednesday","Thursday","Friday","Saturday")),
-             y=factor(Hour),fill=count))+
-  geom_tile()+
-  scale_fill_continuous(low = "white",
-                        high = "darkred",
-                        name="Bike Rental Usage")+
-  #scale_y_continuous(breaks = seq(0,23,1))+
-  guides(fill=F)+
-  labs(x= "Weekday", y= "Hour of the Day", title= "Heatmap of FordBike Rental Hour V.S Day")
-## I think good personalization, is for people to choose (maybe via check boxes) what days of the week they want to see.
-## Another personalization in the app is for people to choose a count range, probably just greater than, on a scale.
+```
+
+
+```{r}
+# Reading all data downloaded form the Ford Bike site
+bikedata17 = read.csv("2017-fordgobike-tripdata.csv")
+bikedata18_1 = read.csv("201801_fordgobike_tripdata.csv")
+bikedata18_2 = read.csv("201802_fordgobike_tripdata.csv")
+bikedata18_3 = read.csv("201803_fordgobike_tripdata.csv")
+
+# Combine them into Single data
+Bikedata=rbind(bikedata17,
+               bikedata18_1,
+               bikedata18_2,
+               bikedata18_3)
+
+# Data cleaning for the start and end time 
+finalbikedata = Bikedata%>%
+  separate(col= start_time,
+           into = c("start_Time","Junk1"),
+           sep = 19,remove = T )%>%
+  separate(col= end_time,
+           into = c("end_Time","Junk2"),
+           sep = 19,remove = T )
+
+#Removing Junk Created
+finalbikedata = finalbikedata[,-c(3,5)]  
+  
+#Formatting date and Time using Lubridate
+finalbikedata$start_Time = ymd_hms(finalbikedata$start_Time)
+finalbikedata$end_Time = ymd_hms(finalbikedata$end_Time)
+```
+
+
+```{r}
+### For Spider Map
+## Compile data specific for spider map
+Spiderdata=finalbikedata%>%
+  filter(start_station_id %in% c(3,5,144))%>% ## Input to be given from Shiny, with multiple select od start station_id
+  group_by(start_station_id,
+           start_station_longitude,
+           start_station_latitude,
+           end_station_id,
+           end_station_longitude,
+           end_station_latitude)%>%
+  summarise(count=n())%>%
+  filter(count>= 100)## Input from Shiny , with slider bar giving rang of frequency 
+
+
+##Consolidate into flow pattern for path lines , 
+##To compute distances for angular (longitude/latitude) locations
+
+flows <- gcIntermediate(Spiderdata[,2:3],
+                        Spiderdata[,5:6],
+                        sp = TRUE,
+                        addStartEnd = TRUE)
+
+flows$count <- Spiderdata$count/100
+flows$start_station_id <- Spiderdata$start_station_id
+flows$end_station_id <- Spiderdata$end_station_id
+
+##Creating spider MAp
+
+##To create label on the line
+hover <- paste0(flows$start_station_id, " to ", 
+                flows$end_station_id, ': ', 
+                as.character(flows$count*100))
+
+## To map origin stations to colours as there are too many 
+pal <- colorFactor(brewer.pal(4, 'Set2'), flows$start_station_id)
+
+##Creating Interactive Spider MAp
+leaflet() %>%
+  addProviderTiles('CartoDB.Positron') %>%
+  addPolylines(data = flows, weight = ~count, label = hover, 
+               group = ~start_station_id, color = ~pal(start_station_id)) %>%
+  addLayersControl(overlayGroups = unique(flows$start_station_id), 
+                   options = layersControlOptions(collapsed = FALSE))
+```
+
+```{r}
+## Setup data to summarize day of the week
+
+bikestartdays = finalbikedata %>%
+mutate(dayweek = wday(start_Time, label = T, abbr = F), hourday = hour(start_Time)) %>%
+group_by(dayweek, hourday) %>%
+summarise(count = n())
+
+bikeenddays = finalbikedata %>%
+mutate(dayweek = wday(end_Time, label = T, abbr = F), hourday = hour(end_Time)) %>%
+group_by(dayweek, hourday) %>%
+summarise(count = n())
+
+# Build heatmaps
+ggplot(bikestartdays, aes(x = dayweek,
+ y = factor(hourday),
+ fill = count)) +
+geom_tile(color = "black") +
+scale_fill_gradient(low = "white", high = "darkgreen") +
+ xlab("Day of week") +
+ ylab("Hour of day") +
+ggtitle("Heatmap of Start Times of Bike Renters") +
+theme_minimal()
+
+ggplot(bikeenddays, aes(x = dayweek,
+y = factor(hourday),
+fill = count)) +
+geom_tile(color = "black") +
+scale_fill_gradient(low = "white", high = "darkred") +
+xlab("Day of week") +
+ylab("Hour of day") +
+ggtitle("Heatmap of Start Times of Bike Renters") +
+theme_minimal()
+```
+
+```{r}
+ui <- fluidPage(
+  
+  titlePanel("Ford bike Start Times usage"),
+  sidebarLayout(
+    sidebarPanel(
+      helpText("Please select the start times days for which you want to see the bike usage heatmap"),
+      checkboxGroupInput(inputId = "dayweekchoice1", 
+                         label = "Day", 
+                         choices = unique(bikestartdays$dayweek),
+                         selected = unique(bikestartdays$dayweek))
+      
+    ), 
+    mainPanel(
+      plotOutput(outputId = "plot")
+    )
+  )
+)
+
+server <- function(input, output) {
+  
+  bikestartdaysin1=reactive({bikestartdays %>% 
+      filter(dayweek %in% input$dayweekchoice1)})
+  
+  output$plot= renderPlot({ggplot(bikestartdaysin1(), aes(x = dayweek, 
+                                                         y = factor(hourday), 
+                                                         fill = count)) + 
+      geom_tile(color = "black") + 
+      scale_fill_gradient(low = "white", high = "darkgreen") +
+      xlab("Day of week") +
+      ylab("Hour of day") +
+      ggtitle("Heatmap of Start Times of Bike Renters") +
+      theme_minimal()})
+  
+  
+}
+
+shinyApp(ui, server)
 
 ```
 
+```{r}
+
+
+ui <- fluidPage(
+  
+  titlePanel("Ford bike End Times usage"),
+  sidebarLayout(
+    sidebarPanel(
+      helpText("Please select the end times days for which you want to see the bike usage heatmap"),
+      checkboxGroupInput(inputId = "dayweekchoice2", 
+                         label = "Day", 
+                         choices = unique(bikestartdays$dayweek),
+                         selected = unique(bikestartdays$dayweek))
+      
+    ), 
+    mainPanel(
+      plotOutput(outputId = "plot")
+    )
+  )
+)
+
+server <- function(input, output) {
+  
+  bikestartdaysin2=reactive({bikestartdays %>% 
+      filter(dayweek %in% input$dayweekchoice2)})
+  
+  output$plot= renderPlot({ggplot(bikeenddays, aes(x = dayweek, 
+                                                   y = factor(hourday), 
+                                                   fill = count)) + 
+      geom_tile(color = "black") + 
+      scale_fill_gradient(low = "white", high = "darkred") +
+      xlab("Day of week") +
+      ylab("Hour of day") +
+      ggtitle("Heatmap of End Times of Bike Renters") +
+      theme_minimal()})
+  
+  
+}
+
+shinyApp(ui, server)
+```

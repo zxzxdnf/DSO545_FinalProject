@@ -19,6 +19,7 @@ Bikedata=rbind(bikedata17,
                bikedata18_1,
                bikedata18_2,
                bikedata18_3)
+bikedata = as.data.table(Bikedata)
 
 # Data cleaning for the start and end time 
 finalbikedata = Bikedata%>%
